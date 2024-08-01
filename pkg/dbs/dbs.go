@@ -10,7 +10,7 @@ import (
 )
 
 type Service struct {
-	db *sql.DB
+	DB *sql.DB
 }
 
 var (
@@ -41,10 +41,10 @@ func New() *Service {
 	}
 	fmt.Println("Db Connected")
 
-	return &Service{db: db}
+	return &Service{DB: db}
 }
 
 func (s *Service) Close() error {
 	log.Printf("Disconnected from database: %s", dbname)
-	return s.db.Close()
+	return s.DB.Close()
 }
