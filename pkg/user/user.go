@@ -1,11 +1,21 @@
 package user
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	random "math/rand"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/dudeiebot/sportPeerGo/pkg/dbs"
+	"github.com/dudeiebot/sportPeerGo/pkg/user/model"
 )
 
 func UserRoutes(r chi.Router, dbs *dbs.Service) {
@@ -20,9 +30,66 @@ func UserRoutes(r chi.Router, dbs *dbs.Service) {
 
 func createUser(dbService *dbs.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Your logic to create a user
-		w.Write([]byte("Create User"))
+		var user model.User
+		if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		pwbytes := []byte(user.Password)
+		hashedPass, err := bcrypt.GenerateFromPassword(pwbytes, bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		user.Password = string(hashedPass)
+		user.Username = generateUsername(user.Email)
+		user.VerificationToken, err = verificationToken()
+		// not going to be handling error like this later tho
+		if err != nil {
+			http.Error(w, "Failed to generate verification token", http.StatusInternalServerError)
+			return
+		}
+
+		queri := `INSERT INTO users (username, email, phone, password, verification_token, bio)
+	          VALUES (?, ?, ?, ?, ?, ?)`
+		_, err = dbService.DB.Exec(
+			queri,
+			user.Username,
+			user.Email,
+			user.Phone,
+			user.Password,
+			user.VerificationToken,
+			user.Bio,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(user)
 	}
+}
+
+func verificationToken() (string, error) {
+	bytes := make([]byte, 16)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate random token: %w", err)
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func generateUsername(email string) string {
+	parts := strings.Split(email, "@")
+	if len(parts) > 1 {
+		baseUsername := parts[0]
+		r := random.New(random.NewSource(time.Now().Unix()))
+		randNum := r.Intn(1000)
+		return baseUsername + strconv.Itoa(randNum)
+	}
+	return ""
 }
 
 func loginUser(dbService *dbs.Service) http.HandlerFunc {
