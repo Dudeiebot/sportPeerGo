@@ -1,6 +1,12 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/go-playground/validator/v10"
+
+	"github.com/dudeiebot/sportPeerGo/pkg/user/errors"
+)
 
 type User struct {
 	ID                int       `json:"id"`
@@ -14,4 +20,21 @@ type User struct {
 	IsVerified        bool      `json:"is_verified"`
 	VerificationID    string    `json:"verification_id"`
 	Bio               string    `json:"bio"`
+}
+
+func (u *User) ValidateUser() error {
+	rules := map[string]string{
+		"Email":    "required,email",
+		"Phone":    "required,e164",
+		"Password": "required,gte=6",
+	}
+
+	valid := validator.New()
+	valid.RegisterStructValidationMapRules(rules, u)
+
+	err := valid.Struct(u)
+	if err != nil {
+		return errors.ValidatorErrors(err)
+	}
+	return nil
 }
