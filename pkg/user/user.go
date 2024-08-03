@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
 	random "math/rand"
 	"net/http"
 	"strconv"
@@ -15,7 +16,9 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/dudeiebot/sportPeerGo/pkg/dbs"
+	"github.com/dudeiebot/sportPeerGo/pkg/user/email"
 	"github.com/dudeiebot/sportPeerGo/pkg/user/model"
+	"github.com/dudeiebot/sportPeerGo/pkg/user/queries"
 )
 
 func UserRoutes(r chi.Router, dbs *dbs.Service) {
@@ -42,33 +45,36 @@ func createUser(dbService *dbs.Service) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		user.Password = string(hashedPass)
 		user.Username = generateUsername(user.Email)
 		user.VerificationToken, err = verificationToken()
-		// not going to be handling error like this later tho
 		if err != nil {
 			http.Error(w, "Failed to generate verification token", http.StatusInternalServerError)
 			return
 		}
 
-		queri := `INSERT INTO users (username, email, phone, password, verification_token, bio)
-	          VALUES (?, ?, ?, ?, ?, ?)`
-		_, err = dbService.DB.Exec(
-			queri,
-			user.Username,
-			user.Email,
-			user.Phone,
-			user.Password,
-			user.VerificationToken,
-			user.Bio,
-		)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+		user.ID = queries.RegisterQuery(user, dbService)
+		if user.ID == 0 {
+			http.Error(w, "Failed to register user", http.StatusInternalServerError)
 			return
 		}
 
+		go func() {
+			err = email.SendVerificationEmail(user.Email, user.VerificationToken, r.Host, r)
+			if err != nil {
+				log.Printf("Failed to send verification email: %v", err)
+				// Decide if you want to return an error to the client or just log it
+				// http.Error(w, "Failed to send verification email", http.StatusInternalServerError)
+				// return
+			}
+		}()
+
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(user)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"message": "User registered successfully. Please check your email for the verification link.",
+			"user":    user,
+		})
 	}
 }
 
