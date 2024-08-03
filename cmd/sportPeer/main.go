@@ -1,17 +1,20 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/dudeiebot/sportPeerGo/pkg/server"
 )
 
 func main() {
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello World"))
-	})
-	http.ListenAndServe(":3000", r)
+	server, err := server.NewServer()
+	if err != nil {
+		log.Fatalf("Failed to initialize server: %v", err)
+	}
+
+	log.Printf("Starting server on %s", server.Addr)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Server failed: %v", err)
+	}
 }
