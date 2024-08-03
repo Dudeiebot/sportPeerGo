@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strconv"
@@ -19,11 +20,11 @@ type Server struct {
 	dbs  *dbs.Service
 }
 
-func NewServer() *http.Server {
+func NewServer() (*http.Server, error) {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 
 	dbService := dbs.New()
-	ServerInstance := &Server{
+	serverInstance := &Server{
 		port: port,
 		dbs:  dbService,
 	}
@@ -32,15 +33,16 @@ func NewServer() *http.Server {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	user.UserRoutes(r, dbService)
+	user.UserRoutes(r, serverInstance.dbs)
 
 	server := &http.Server{
-		Addr:         fmt.Sprintf(":%d", ServerInstance.port),
+		Addr:         fmt.Sprintf(":%d", serverInstance.port),
 		Handler:      r,
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
-	return server
+	log.Printf("Server initialized, listening on port %d", serverInstance.port)
+	return server, nil
 }
