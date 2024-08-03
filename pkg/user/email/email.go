@@ -9,38 +9,47 @@ import (
 	emailNew "github.com/jordan-wright/email"
 )
 
-func sendEmail(email, verificationToken string, r *http.Request, w http.ResponseWriter) {
+func SendVerificationEmail(
+	recipientEmail, verificationToken, host string,
+	req *http.Request,
+) error {
+	var (
+		fromEmail     = os.Getenv("FROM")
+		smtpServer    = os.Getenv("SMTP_SERVER")
+		smtpPort      = os.Getenv("SMTP_PORT")
+		postmarkToken = os.Getenv("POSTMARK_TOKEN")
+	)
+
+	scheme := "http"
+	if req.TLS != nil {
+		scheme = "https"
+	}
+
 	e := emailNew.NewEmail()
-	e.From = fmt.Sprintf("<%s>", os.Getenv("FROM"))
-	e.To = []string{email}
+	e.From = fmt.Sprintf("<%s>", fromEmail)
+	e.To = []string{recipientEmail}
 	e.Subject = "Email Verification Link"
 	e.Text = []byte(
 		fmt.Sprintf(
 			"Please verify your email by clicking the link: %s://%s/auth/verify-email?token=%s",
-			// verify route later
-			r.URL.Scheme,
-			r.Host,
+			scheme,
+			host,
 			verificationToken,
 		),
 	)
 
 	err := e.Send(
-		"smtp.postmarkapp.com:587",
+		fmt.Sprintf("%s:%s", smtpServer, smtpPort),
 		smtp.PlainAuth(
 			"",
-			os.Getenv("POSTMARK_TOKEN"),
-			os.Getenv("POSTMARK_TOKEN"),
-			"smtp.postmarkapp.com",
+			postmarkToken,
+			postmarkToken,
+			smtpServer,
 		),
 	)
 	if err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
+		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	fmt.Fprint(
-		w,
-		"User registered successfully. Please check your email for the verification link.",
-	)
+	return nil
 }
