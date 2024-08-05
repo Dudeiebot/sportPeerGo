@@ -39,6 +39,11 @@ func createUser(dbService *dbs.Service) http.HandlerFunc {
 			return
 		}
 
+		if err := user.ValidateUser(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
 		pwbytes := []byte(user.Password)
 		hashedPass, err := bcrypt.GenerateFromPassword(pwbytes, bcrypt.DefaultCost)
 		if err != nil {
@@ -61,7 +66,7 @@ func createUser(dbService *dbs.Service) http.HandlerFunc {
 		}
 
 		go func() {
-			err = email.SendVerificationEmail(user.Email, user.VerificationToken, r.Host, r)
+			err = email.SendVerificationEmail(user.Email, user.VerificationToken, r)
 			if err != nil {
 				log.Printf("Failed to send verification email: %v", err)
 				// Decide if you want to return an error to the client or just log it
