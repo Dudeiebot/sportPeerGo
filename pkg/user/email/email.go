@@ -9,9 +9,7 @@ import (
 	emailNew "github.com/jordan-wright/email"
 )
 
-func SendVerificationEmail(
-	recipientEmail, verificationToken, host string,
-	req *http.Request,
+func SendVerificationEmail(recipientEmail, verificationToken string, req *http.Request,
 ) error {
 	var (
 		fromEmail     = os.Getenv("FROM")
@@ -20,6 +18,7 @@ func SendVerificationEmail(
 		postmarkToken = os.Getenv("POSTMARK_TOKEN")
 	)
 
+	host := req.Host
 	scheme := "http"
 	if req.TLS != nil {
 		scheme = "https"
