@@ -7,6 +7,7 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
+// handlign custom user input validation errors
 var customErrorMessages = map[string]map[string]string{
 	"Email": {
 		"required": "Email address is required",
