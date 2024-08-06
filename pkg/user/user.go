@@ -69,9 +69,6 @@ func createUser(dbService *dbs.Service) http.HandlerFunc {
 			err = email.SendVerificationEmail(user.Email, user.VerificationToken, r)
 			if err != nil {
 				log.Printf("Failed to send verification email: %v", err)
-				// Decide if you want to return an error to the client or just log it
-				// http.Error(w, "Failed to send verification email", http.StatusInternalServerError)
-				// return
 			}
 		}()
 
