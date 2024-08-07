@@ -129,11 +129,3 @@ func verifyOtp(dbService *dbs.Service) http.HandlerFunc {
 		w.Write([]byte("Delete User by ID: " + userID))
 	}
 }
-
-func verifyEmail(dbService *dbs.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		userID := chi.URLParam(r, "userID")
-		// Your logic to delete a user by ID
-		w.Write([]byte("Delete User by ID: " + userID))
-	}
-}
