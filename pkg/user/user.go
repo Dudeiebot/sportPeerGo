@@ -22,12 +22,12 @@ import (
 )
 
 func UserRoutes(r chi.Router, dbs *dbs.Service) {
-	r.Route("/user", func(r chi.Router) {
+	r.Route("/auth", func(r chi.Router) {
 		r.Post("/register", createUser(dbs))
 		r.Post("/login", loginUser(dbs))
 		r.Post("/logout", logoutUser(dbs))
 		r.Post("/verify-otp", verifyOtp(dbs))
-		r.Post("/verify-email", verifyEmail(dbs))
+		r.Get("/verify-email", email.VerifyEmail(dbs))
 	})
 }
 
