@@ -65,8 +65,14 @@ func createUser(dbService *dbs.Service) http.HandlerFunc {
 			return
 		}
 
+		info := &email.UserInfo{
+			RecipientEmail:    user.Email,
+			VerificationToken: user.VerificationToken,
+			Req:               r,
+		}
+
 		go func() {
-			err = email.SendVerificationEmail(user.Email, user.VerificationToken, r)
+			err = email.SendVerificationEmail(info)
 			if err != nil {
 				log.Printf("Failed to send verification email: %v", err)
 			}
