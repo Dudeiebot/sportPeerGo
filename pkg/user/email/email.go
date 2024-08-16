@@ -33,14 +33,14 @@ type Config struct {
 	PostmarkToken string
 }
 
-func SendVerificationEmail(ctx context.Context, info *UserInfo) error {
-	config := &Config{
-		FromEmail:     os.Getenv("FROM"),
-		SMTPServer:    os.Getenv("SMTP_SERVER"),
-		SMTPPort:      os.Getenv("SMTP_PORT"),
-		PostmarkToken: os.Getenv("POSTMARK_TOKEN"),
-	}
+var config = &Config{
+	FromEmail:     os.Getenv("FROM"),
+	SMTPServer:    os.Getenv("SMTP_SERVER"),
+	SMTPPort:      os.Getenv("SMTP_PORT"),
+	PostmarkToken: os.Getenv("POSTMARK_TOKEN"),
+}
 
+func SendVerificationEmail(ctx context.Context, info *UserInfo) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	host := info.Req.Host
