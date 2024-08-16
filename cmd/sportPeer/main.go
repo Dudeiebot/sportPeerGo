@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -8,12 +9,14 @@ import (
 )
 
 func main() {
-	server, err := server.NewServer()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server, err := server.NewServer(ctx)
 	if err != nil {
 		log.Fatalf("Failed to initialize server: %v", err)
 	}
 
-	log.Printf("Starting server on %s", server.Addr)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Server failed: %v", err)
 	}
