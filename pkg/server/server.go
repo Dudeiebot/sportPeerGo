@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,10 +21,10 @@ type Server struct {
 	dbs  *dbs.Service
 }
 
-func NewServer() (*http.Server, error) {
+func NewServer(ctx context.Context) (*http.Server, error) {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 
-	dbService := dbs.New()
+	dbService := dbs.New(ctx)
 	serverInstance := &Server{
 		port: port,
 		dbs:  dbService,
