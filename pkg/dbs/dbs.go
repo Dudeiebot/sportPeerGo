@@ -15,19 +15,34 @@ type Service struct {
 	DB *sql.DB
 }
 
-var (
-	dbname   = os.Getenv("DB_NAME")
-	password = os.Getenv("DB_PASSWORD")
-	username = os.Getenv("DB_USERNAME")
-	port     = os.Getenv("DB_PORT")
-	host     = os.Getenv("DB_HOST")
-)
+type DBConfig struct {
+	DBName     string
+	DBPassword string
+	DBUsername string
+	DBPort     string
+	DBHost     string
+}
+
+var dbConfig = &DBConfig{
+	DBName:     os.Getenv("DB_NAME"),
+	DBPassword: os.Getenv("DB_PASSWORD"),
+	DBUsername: os.Getenv("DB_USERNAME"),
+	DBPort:     os.Getenv("DB_PORT"),
+	DBHost:     os.Getenv("DB_HOST"),
+}
 
 func New(ctx context.Context) *Service {
 	var err error
 	db, err := sql.Open(
 		"mysql",
-		fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", username, password, host, port, dbname),
+		fmt.Sprintf(
+			"%s:%s@tcp(%s:%s)/%s",
+			dbConfig.DBName,
+			dbConfig.DBPassword,
+			dbConfig.DBHost,
+			dbConfig.DBPort,
+			dbConfig.DBName,
+		),
 	)
 	if err != nil {
 		log.Printf("Error %s when opening DB\n", err)
@@ -50,6 +65,6 @@ func New(ctx context.Context) *Service {
 }
 
 func (s *Service) Close() error {
-	log.Printf("Disconnected from database: %s", dbname)
+	log.Printf("Disconnected from database: %s", dbConfig.DBName)
 	return s.DB.Close()
 }
