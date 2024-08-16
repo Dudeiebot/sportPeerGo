@@ -1,10 +1,12 @@
 package dbs
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -21,7 +23,7 @@ var (
 	host     = os.Getenv("DB_HOST")
 )
 
-func New() *Service {
+func New(ctx context.Context) *Service {
 	var err error
 	db, err := sql.Open(
 		"mysql",
@@ -35,7 +37,10 @@ func New() *Service {
 	db.SetMaxIdleConns(50)
 	db.SetMaxOpenConns(50)
 
-	pingErr := db.Ping()
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	pingErr := db.PingContext(ctx)
 	if pingErr != nil {
 		log.Fatal(pingErr)
 	}
