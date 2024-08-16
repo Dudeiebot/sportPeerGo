@@ -1,12 +1,14 @@
 package email
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/smtp"
 	"os"
+	"time"
 
 	emailNew "github.com/jordan-wright/email"
 
@@ -24,14 +26,23 @@ type Response struct {
 	Message string `json:"message"`
 }
 
-func SendVerificationEmail(info *UserInfo) error {
-	var (
-		fromEmail     = os.Getenv("FROM")
-		smtpServer    = os.Getenv("SMTP_SERVER")
-		smtpPort      = os.Getenv("SMTP_PORT")
-		postmarkToken = os.Getenv("POSTMARK_TOKEN")
-	)
+type Config struct {
+	FromEmail     string
+	SMTPServer    string
+	SMTPPort      string
+	PostmarkToken string
+}
 
+func SendVerificationEmail(ctx context.Context, info *UserInfo) error {
+	config := &Config{
+		FromEmail:     os.Getenv("FROM"),
+		SMTPServer:    os.Getenv("SMTP_SERVER"),
+		SMTPPort:      os.Getenv("SMTP_PORT"),
+		PostmarkToken: os.Getenv("POSTMARK_TOKEN"),
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 	host := info.Req.Host
 	scheme := "http"
 	if info.Req.TLS != nil {
@@ -39,7 +50,7 @@ func SendVerificationEmail(info *UserInfo) error {
 	}
 
 	e := emailNew.NewEmail()
-	e.From = fmt.Sprintf("<%s>", fromEmail)
+	e.From = fmt.Sprintf("<%s>", config.FromEmail)
 	e.To = []string{info.RecipientEmail}
 	e.Subject = "Email Verification Link"
 	e.Text = []byte(
@@ -52,12 +63,12 @@ func SendVerificationEmail(info *UserInfo) error {
 	)
 
 	err := e.Send(
-		fmt.Sprintf("%s:%s", smtpServer, smtpPort),
+		fmt.Sprintf("%s:%s", config.SMTPServer, config.SMTPPort),
 		smtp.PlainAuth(
 			"",
-			postmarkToken,
-			postmarkToken,
-			smtpServer,
+			config.PostmarkToken,
+			config.PostmarkToken,
+			config.SMTPServer,
 		),
 	)
 	if err != nil {
@@ -69,9 +80,10 @@ func SendVerificationEmail(info *UserInfo) error {
 
 func VerifyEmail(dbService *dbs.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
 		token := r.URL.Query().Get("token")
 
-		res, err := queries.VerifyEmailQueries(dbService, token)
+		res, err := queries.VerifyEmailQueries(ctx, dbService, token)
 		if err != nil {
 			log.Printf("Error executing db query: %v\n", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
