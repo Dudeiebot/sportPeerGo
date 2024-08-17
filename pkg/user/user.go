@@ -1,6 +1,7 @@
 package user
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -72,7 +73,7 @@ func createUser(dbService *dbs.Service) http.HandlerFunc {
 		}
 
 		go func() {
-			err = email.SendVerificationEmail(info)
+			err = email.SendVerificationEmail(context.Background(), info)
 			if err != nil {
 				log.Printf("Failed to send verification email: %v", err)
 			}
