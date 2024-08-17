@@ -1,6 +1,7 @@
 package queries
 
 import (
+	"context"
 	"database/sql"
 	"log"
 
@@ -26,9 +27,9 @@ func RegisterQuery(u model.User, d *dbs.Service) int {
 	return u.ID
 }
 
-func VerifyEmailQueries(d *dbs.Service, token string) (sql.Result, error) {
+func VerifyEmailQueries(ctx context.Context, d *dbs.Service, token string) (sql.Result, error) {
 	queri := `UPDATE users SET is_verified = TRUE, verification_token = NULL WHERE verification_token = ?`
 
-	res, err := d.DB.Exec(queri, token)
+	res, err := d.DB.ExecContext(ctx, queri, token)
 	return res, err
 }
