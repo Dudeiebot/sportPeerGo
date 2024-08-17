@@ -37,11 +37,11 @@ func New(ctx context.Context) *Service {
 		"mysql",
 		fmt.Sprintf(
 			"%s:%s@tcp(%s:%s)/%s",
-			dbConfig.DBName,
-			dbConfig.DBPassword,
-			dbConfig.DBHost,
-			dbConfig.DBPort,
-			dbConfig.DBName,
+			dbConfig.DBUsername, // Username
+			dbConfig.DBPassword, // Password
+			dbConfig.DBHost,     // Host
+			dbConfig.DBPort,     // Port
+			dbConfig.DBName,     // Database name
 		),
 	)
 	if err != nil {
