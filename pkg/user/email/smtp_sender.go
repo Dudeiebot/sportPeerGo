@@ -19,7 +19,6 @@ import (
 type UserInfo struct {
 	RecipientEmail    string
 	VerificationToken string
-	Req               *http.Request
 }
 
 type Response struct {
@@ -40,14 +39,9 @@ var config = &Config{
 	PostmarkToken: os.Getenv("POSTMARK_TOKEN"),
 }
 
-func SendVerificationEmail(ctx context.Context, info *UserInfo) error {
+func SendVerificationEmail(ctx context.Context, info *UserInfo, host, scheme string) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	host := info.Req.Host
-	scheme := "http"
-	if info.Req.TLS != nil {
-		scheme = "https"
-	}
 
 	e := emailNew.NewEmail()
 	e.From = fmt.Sprintf("<%s>", config.FromEmail)
