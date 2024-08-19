@@ -5,14 +5,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/dudeiebot/sportPeerGo/pkg/server"
+	"github.com/dudeiebot/sportPeerGo/pkg/httpservice"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	server, err := server.NewServer(ctx)
+	server, err := httpservice.NewServer(ctx)
 	if err != nil {
 		log.Fatalf("Failed to initialize server: %v", err)
 	}
