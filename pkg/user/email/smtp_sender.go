@@ -2,18 +2,12 @@ package email
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"log"
-	"net/http"
 	"net/smtp"
 	"os"
 	"time"
 
 	emailNew "github.com/jordan-wright/email"
-
-	"github.com/dudeiebot/sportPeerGo/pkg/dbs"
-	"github.com/dudeiebot/sportPeerGo/pkg/user/queries"
 )
 
 type UserInfo struct {
@@ -70,29 +64,4 @@ func SendVerificationEmail(ctx context.Context, info *UserInfo, host, scheme str
 	}
 
 	return nil
-}
-
-func VerifyEmail(dbService *dbs.Service) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		ctx := r.Context()
-		token := r.URL.Query().Get("token")
-
-		res, err := queries.VerifyEmailQueries(ctx, dbService, token)
-		if err != nil {
-			log.Printf("Error executing db query: %v\n", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-			return
-		}
-
-		rowAffected, err := res.RowsAffected()
-
-		if rowAffected == 0 {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(Response{Message: "Invalid or expired token"})
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(Response{Message: "Email Verifed Successfully"})
-	}
 }
