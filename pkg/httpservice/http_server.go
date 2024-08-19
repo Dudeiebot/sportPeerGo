@@ -1,8 +1,7 @@
-package server
+package httpservice
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,16 +12,20 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"github.com/dudeiebot/sportPeerGo/pkg/dbs"
+	"github.com/dudeiebot/sportPeerGo/pkg/adapter/dbs"
+	"github.com/dudeiebot/sportPeerGo/pkg/adapter/queries"
 	"github.com/dudeiebot/sportPeerGo/pkg/user"
 	"github.com/dudeiebot/sportPeerGo/pkg/user/email"
 	"github.com/dudeiebot/sportPeerGo/pkg/user/model"
-	"github.com/dudeiebot/sportPeerGo/pkg/user/queries"
 )
 
 type Server struct {
 	port int
 	DBS  *dbs.Service
+}
+
+type Response struct {
+	Message string `json:"message"`
 }
 
 func NewServer(ctx context.Context) (*http.Server, error) {
@@ -37,7 +40,6 @@ func NewServer(ctx context.Context) (*http.Server, error) {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-
 	AuthRoutes(r, serverInstance)
 
 	server := &http.Server{
@@ -50,38 +52,6 @@ func NewServer(ctx context.Context) (*http.Server, error) {
 
 	log.Printf("Server initialized, listening on port %d", serverInstance.port)
 	return server, nil
-}
-
-func AuthRoutes(r chi.Router, s *Server) {
-	r.Route("/auth", func(r chi.Router) {
-		createUser := CreateUser(s)
-		r.Post("/register", user.AddHostSchemeMiddleware(createUser))
-		// r.Post("/login", loginUser(dbs))
-		// r.Post("/logout", logoutUser(dbs))
-		// r.Post("/verify-otp", verifyOtp(dbs))
-		r.Get("/verify-email", email.VerifyEmail(s.DBS))
-	})
-}
-
-func NewHandler[IN, OUT any](
-	s *Server,
-	targetFunc func(context.Context, *Server, IN) (OUT, error),
-) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var in IN
-		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		out, err := targetFunc(r.Context(), s, in)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(out)
-	}
 }
 
 func CreateUser(s *Server) http.HandlerFunc {
@@ -137,4 +107,24 @@ func CreateUser(s *Server) http.HandlerFunc {
 			return response, nil
 		},
 	)
+}
+
+func VerifyEmail(s *Server) http.HandlerFunc {
+	return NewHandler(s, func(ctx context.Context, s *Server, r *http.Request) (*Response, error) {
+		token := r.URL.Query().Get("token")
+
+		res, err := queries.VerifyEmailQueries(ctx, s.DBS, token)
+		if err != nil {
+			log.Printf("Error executing db query: %v\n", err)
+			return nil, fmt.Errorf("internal server error")
+		}
+
+		rowAffected, err := res.RowsAffected()
+
+		if rowAffected == 0 {
+			return &Response{Message: "Invalid or expired token"}, nil
+		}
+
+		return &Response{Message: "Email Verifed Successfully"}, nil
+	})
 }
