@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"log"
 
-	"github.com/dudeiebot/sportPeerGo/pkg/dbs"
+	"github.com/dudeiebot/sportPeerGo/pkg/adapter/dbs"
 	"github.com/dudeiebot/sportPeerGo/pkg/user/model"
 )
 
