@@ -1,17 +1,23 @@
 package main
 
 import (
+	"context"
+	"log"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/dudeiebot/sportPeerGo/pkg/httpservice"
 )
 
 func main() {
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Hello World"))
-	})
-	http.ListenAndServe(":3000", r)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	server, err := httpservice.NewServer(ctx)
+	if err != nil {
+		log.Fatalf("Failed to initialize server: %v", err)
+	}
+
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Server failed: %v", err)
+	}
 }
