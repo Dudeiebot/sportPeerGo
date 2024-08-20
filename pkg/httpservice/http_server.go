@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/dudeiebot/sportPeerGo/pkg/adapter/dbs"
 	"github.com/dudeiebot/sportPeerGo/pkg/adapter/queries"
@@ -26,6 +27,11 @@ type Server struct {
 
 type Response struct {
 	Message string `json:"message"`
+}
+
+type LoginResponse struct {
+	Message string `json:"message"`
+	Token   string `json:"accessToken"`
 }
 
 func NewServer(ctx context.Context) (*http.Server, error) {
@@ -56,8 +62,7 @@ func NewServer(ctx context.Context) (*http.Server, error) {
 
 func CreateUser(s *Server) http.HandlerFunc {
 	return NewHandler(
-		s,
-		func(ctx context.Context, s *Server, u model.User) (map[string]interface{}, error) {
+		func(ctx context.Context, u model.User) (map[string]interface{}, error) {
 			if err := u.ValidateUser(); err != nil {
 				return nil, err
 			}
@@ -110,7 +115,7 @@ func CreateUser(s *Server) http.HandlerFunc {
 }
 
 func VerifyEmail(s *Server) http.HandlerFunc {
-	return NewHandler(s, func(ctx context.Context, s *Server, r *http.Request) (*Response, error) {
+	return NewHandler(func(ctx context.Context, r *http.Request) (*Response, error) {
 		token := r.URL.Query().Get("token")
 
 		res, err := queries.VerifyEmailQueries(ctx, s.DBS, token)
@@ -127,4 +132,37 @@ func VerifyEmail(s *Server) http.HandlerFunc {
 
 		return &Response{Message: "Email Verifed Successfully"}, nil
 	})
+}
+
+func LoginUser(s *Server) http.HandlerFunc {
+	return NewHandler(
+		func(ctx context.Context, c model.Credentials) (*LoginResponse, error) {
+			u, err := queries.GetHashedAuth(ctx, c, s.DBS)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"Invalid Credentials, Please provide the correct email or phone number",
+				)
+			}
+
+			if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(c.Password)); err != nil {
+				return nil, fmt.Errorf("Invalid Credentials, Please provide the correct password")
+			}
+
+			if !u.IsVerified {
+				return nil, fmt.Errorf("Please Verify your account before logging in")
+			}
+
+			accessToken, err := user.GenerateSecretToken(int64(u.ID))
+			if err != nil {
+				return nil, err
+			}
+
+			u.Password = ""
+
+			return &LoginResponse{
+				Message: "User Logged In Successfully",
+				Token:   accessToken,
+			}, nil
+		},
+	)
 }
