@@ -14,6 +14,12 @@ type User struct {
 	Password          string `json:"password"`
 	VerificationToken string `json:"VerificationToken"`
 	Bio               string `json:"bio"`
+	IsVerified        bool   `json:"is_verified"`
+}
+
+type Credentials struct {
+	Access   string `json:"access"`
+	Password string `json:"password"`
 }
 
 func (u *User) ValidateUser() error {
