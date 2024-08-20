@@ -2,17 +2,52 @@ package user
 
 import (
 	"context"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	random "math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+type Claim struct {
+	Subject   int64 `json:"sub"`
+	IssuedAt  int64 `json:"iat"`
+	ExpiredAt int64 `json:"exp"`
+}
+
+var secret []byte
+
+func GenerateSecretToken(id int64) (string, error) {
+	secret = []byte(os.Getenv("SECRET"))
+	now := time.Now().Unix()
+
+	claims := Claim{
+		Subject:   id,
+		IssuedAt:  now,
+		ExpiredAt: now + 3600,
+	}
+
+	claimJson, err := json.Marshal(claims)
+	if err != nil {
+		return "", nil
+	}
+	payLoad := base64.URLEncoding.EncodeToString(claimJson)
+	h := hmac.New(sha256.New, secret)
+	h.Write([]byte(payLoad))
+	sig := base64.URLEncoding.EncodeToString(h.Sum(nil))
+	token := payLoad + "." + sig
+	return token, nil
+}
 
 func VerificationToken() (string, error) {
 	bytes := make([]byte, 16)
@@ -50,14 +85,6 @@ func AddHostSchemeMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		}
 		ctx := context.WithValue(r.Context(), "host", r.Host)
 		ctx = context.WithValue(ctx, "scheme", scheme)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-func AddTokenMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token := r.URL.Query().Get("token")
-		ctx := context.WithValue(r.Context(), "token", token)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
