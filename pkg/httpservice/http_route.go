@@ -8,12 +8,10 @@ import (
 
 func AuthRoutes(r chi.Router, s *Server) {
 	r.Route("/auth", func(r chi.Router) {
-		createUser := CreateUser(s)
-		r.Post("/register", user.AddHostSchemeMiddleware(createUser))
-		// r.Post("/login", loginUser(dbs))
+		r.Post("/register", user.AddHostSchemeMiddleware(CreateUser(s)))
+		r.Post("/login", LoginUser(s))
 		// r.Post("/logout", logoutUser(dbs))
 		// r.Post("/verify-otp", verifyOtp(dbs))
-		verifyEmail := VerifyEmail(s)
-		r.Get("/verify-email", verifyEmail)
+		r.Get("/verify-email", VerifyEmail(s))
 	})
 }
