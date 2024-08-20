@@ -8,8 +8,7 @@ import (
 )
 
 func NewHandler[IN, OUT any](
-	s *Server,
-	targetFunc func(context.Context, *Server, IN) (OUT, error),
+	targetFunc func(context.Context, IN) (OUT, error),
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var in IN
@@ -22,10 +21,22 @@ func NewHandler[IN, OUT any](
 			in = any(r).(IN)
 		}
 
-		out, err := targetFunc(r.Context(), s, in)
+		out, err := targetFunc(r.Context(), in)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		switch v := any(out).(type) {
+		case *LoginResponse:
+			http.SetCookie(w, &http.Cookie{
+				Name:     "token",
+				Value:    v.Token,
+				HttpOnly: true,
+				Secure:   true,
+				MaxAge:   3600,
+				SameSite: http.SameSiteStrictMode,
+			})
 		}
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(out)
