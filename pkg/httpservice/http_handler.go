@@ -11,6 +11,10 @@ func NewHandler[IN, OUT any](
 	targetFunc func(context.Context, IN) (OUT, error),
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// if user.IsLoggedOut(r) {
+		// 	http.Error(w, "User is logged out", http.StatusUnauthorized)
+		// 	return
+		// }
 		var in IN
 		if reflect.TypeOf(in) != reflect.TypeOf((*http.Request)(nil)) {
 			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
@@ -35,6 +39,16 @@ func NewHandler[IN, OUT any](
 				HttpOnly: true,
 				Secure:   true,
 				MaxAge:   3600,
+				SameSite: http.SameSiteStrictMode,
+			})
+		case *LogoutResponse:
+			http.SetCookie(w, &http.Cookie{
+				Name:     "token",
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+				Secure:   true,
 				SameSite: http.SameSiteStrictMode,
 			})
 		}
