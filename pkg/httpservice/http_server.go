@@ -34,6 +34,10 @@ type LoginResponse struct {
 	Token   string `json:"accessToken"`
 }
 
+type LogoutResponse struct {
+	Message string `json:"message"`
+}
+
 func NewServer(ctx context.Context) (*http.Server, error) {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 
@@ -165,4 +169,12 @@ func LoginUser(s *Server) http.HandlerFunc {
 			}, nil
 		},
 	)
+}
+
+func LogoutUser(s *Server) http.HandlerFunc {
+	return NewHandler(func(ctx context.Context, r *http.Request) (*LogoutResponse, error) {
+		return &LogoutResponse{
+			Message: "User Logged Out",
+		}, nil
+	})
 }
