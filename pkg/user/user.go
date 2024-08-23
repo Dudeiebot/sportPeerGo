@@ -88,3 +88,12 @@ func AddHostSchemeMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
+
+func IsLoggedOut(r *http.Request) bool {
+	cookie, err := r.Cookie("token")
+	if err != nil || cookie.Value == "" {
+		return true
+	}
+
+	return false
+}
