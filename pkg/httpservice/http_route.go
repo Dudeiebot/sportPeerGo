@@ -15,3 +15,9 @@ func AuthRoutes(r chi.Router, s *Server) {
 		r.Get("/verify-email", VerifyEmail(s))
 	})
 }
+
+func UserRoute(r chi.Router, s *Server) {
+	r.Route("/users", func(r chi.Router) {
+		r.Put("/user/{id}", user.AuthMiddleware(UpdateUsername(s)))
+	})
+}
