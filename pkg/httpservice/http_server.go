@@ -2,6 +2,7 @@ package httpservice
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -51,6 +52,7 @@ func NewServer(ctx context.Context) (*http.Server, error) {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	AuthRoutes(r, serverInstance)
+	UserRoute(r, serverInstance)
 
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", serverInstance.port),
@@ -176,5 +178,40 @@ func LogoutUser(s *Server) http.HandlerFunc {
 		return &LogoutResponse{
 			Message: "User Logged Out",
 		}, nil
+	})
+}
+
+func UpdateUsername(s *Server) http.HandlerFunc {
+	return NewHandler(func(ctx context.Context, req *http.Request) (*Response, error) {
+		id := chi.URLParam(req, "id")
+
+		userId := ctx.Value("userId").(int64)
+		idInt, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
+			return &Response{Message: "invalid user ID format"}, nil
+		}
+
+		if idInt != userId {
+			return &Response{Message: "Unauthorized"}, nil
+		}
+
+		var user model.User
+		if err := json.NewDecoder(req.Body).Decode(&user); err != nil {
+			return &Response{Message: "invalid request body"}, nil
+		}
+		user.ID = int(userId)
+
+		res, err := queries.UsernameQueries(ctx, s.DBS, user)
+		if err != nil {
+			log.Printf("Error executing db query: %v\n", err)
+			return nil, fmt.Errorf("internal server error")
+		}
+
+		rowsAffected, err := res.RowsAffected()
+		if err != nil || rowsAffected == 0 {
+			return &Response{Message: "No rows affected or user not found"}, nil
+		}
+
+		return &Response{Message: "Username successfully changed"}, nil
 	})
 }
