@@ -49,3 +49,10 @@ func VerifyEmailQueries(ctx context.Context, d *dbs.Service, token string) (sql.
 	res, err := d.DB.ExecContext(ctx, queri, token)
 	return res, err
 }
+
+func UsernameQueries(ctx context.Context, d *dbs.Service, u model.User) (sql.Result, error) {
+	queri := `UPDATE users SET username = ? WHERE id = ?`
+
+	res, err := d.DB.ExecContext(ctx, queri, u.Username, u.ID)
+	return res, err
+}
