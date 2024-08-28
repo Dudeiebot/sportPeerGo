@@ -97,3 +97,63 @@ func IsLoggedOut(r *http.Request) bool {
 
 	return false
 }
+
+func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			http.Error(w, "Missing Authorization header", http.StatusUnauthorized)
+			return
+		}
+
+		token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer"))
+		if token == authHeader {
+			http.Error(w, "Invalid Authorization header format", http.StatusUnauthorized)
+			return
+		}
+
+		claims, err := ValidateToken(token)
+		if err != nil {
+			http.Error(w, "Invalid or expired token", http.StatusUnauthorized)
+			return
+		}
+		ctx := context.WithValue(r.Context(), "userId", claims.Subject)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+func ValidateToken(token string) (*Claim, error) {
+	parts := strings.Split(token, ".")
+
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid token format")
+	}
+
+	payload := parts[0]
+	sig := parts[1]
+
+	secret := []byte(os.Getenv("SECRET"))
+	h := hmac.New(sha256.New, secret)
+	h.Write([]byte(payload))
+	expectedSig := base64.URLEncoding.EncodeToString(h.Sum(nil))
+
+	if sig != expectedSig {
+		return nil, fmt.Errorf("invalid token signature")
+	}
+
+	claimJson, err := base64.URLEncoding.DecodeString(payload)
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload encoding")
+	}
+
+	var claims Claim
+	if err := json.Unmarshal(claimJson, &claims); err != nil {
+		return nil, fmt.Errorf("invalid claims")
+	}
+
+	if claims.ExpiredAt < time.Now().Unix() {
+		return nil, fmt.Errorf("token expired")
+	}
+
+	return &claims, nil
+}
