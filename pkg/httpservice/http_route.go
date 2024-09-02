@@ -18,6 +18,7 @@ func AuthRoutes(r chi.Router, s *Server) {
 
 func UserRoute(r chi.Router, s *Server) {
 	r.Route("/users", func(r chi.Router) {
-		r.Put("/user/{id}", user.AuthMiddleware(UpdateUsername(s)))
+		r.Put("/username/{id}", user.AuthMiddleware(UpdateUsername(s)))
+		r.Put("/email/{id}", user.AuthMiddleware(UpdateEmail(s)))
 	})
 }
