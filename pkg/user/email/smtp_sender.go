@@ -1,4 +1,4 @@
-package email
+package smtps
 
 import (
 	"context"
@@ -47,6 +47,38 @@ func SendVerificationEmail(ctx context.Context, info *UserInfo, host, scheme str
 			scheme,
 			host,
 			info.VerificationToken,
+		),
+	)
+
+	err := e.Send(
+		fmt.Sprintf("%s:%s", config.SMTPServer, config.SMTPPort),
+		smtp.PlainAuth(
+			"",
+			config.PostmarkToken,
+			config.PostmarkToken,
+			config.SMTPServer,
+		),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	return nil
+}
+
+func SendOtpEmail(ctx context.Context, info *UserInfo) error {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	e := emailNew.NewEmail()
+	e.From = fmt.Sprintf("<%s>", config.FromEmail)
+	e.To = []string{info.RecipientEmail}
+	e.Subject = "Email Verification Link"
+	e.Text = []byte(
+		fmt.Sprintf(
+			"Here is your OTP: %s\n This email is for %s",
+			info.VerificationToken,
+			info.RecipientEmail,
 		),
 	)
 
