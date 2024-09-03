@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 
 	"github.com/dudeiebot/sportPeerGo/pkg/adapter/dbs"
@@ -11,6 +12,7 @@ import (
 )
 
 func RegisterQuery(u model.User, d *dbs.Service) int {
+	// add ctx
 	queri := `INSERT INTO users (username, email, phone, password, verification_token, bio)VALUES (?, ?, ?, ?, ?, ?)`
 
 	res, err := d.DB.Exec(queri, u.Username,
@@ -55,4 +57,25 @@ func UsernameQueries(ctx context.Context, d *dbs.Service, u model.User) (sql.Res
 
 	res, err := d.DB.ExecContext(ctx, queri, u.Username, u.ID)
 	return res, err
+}
+
+func EmailQueries(ctx context.Context, d *dbs.Service, u model.User) (sql.Result, error) {
+	queri := `UPDATE users SET email = ? WHERE id = ?`
+
+	res, err := d.DB.ExecContext(ctx, queri, u.Email, u.ID)
+	return res, err
+}
+
+func PassQueries(ctx context.Context, d *dbs.Service, f model.ForgetPass) error {
+	queri := `
+		UPDATE users
+		SET otp = ?, otp_expiration = ?
+		WHERE email = ?
+	`
+	_, err := d.DB.ExecContext(ctx, queri, f.Otp, f.ExpirationTime, f.Email)
+	if err != nil {
+		return fmt.Errorf("error updating user's OTP in the database: %w", err)
+	}
+
+	return nil
 }
