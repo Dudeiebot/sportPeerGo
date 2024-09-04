@@ -11,7 +11,7 @@ func AuthRoutes(r chi.Router, s *Server) {
 		r.Post("/register", user.AddHostSchemeMiddleware(CreateUser(s)))
 		r.Post("/login", LoginUser(s))
 		r.Post("/logout", LogoutUser(s))
-		// r.Post("/verify-otp", verifyOtp(dbs))
+		r.Post("/pass", user.AddHostSchemeMiddleware(VerifyOtpAndUpdatePass(s)))
 		r.Get("/verify-email", VerifyEmail(s))
 	})
 }
