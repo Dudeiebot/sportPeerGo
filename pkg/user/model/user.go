@@ -1,6 +1,8 @@
 package model
 
 import (
+	"time"
+
 	"github.com/go-playground/validator/v10"
 
 	"github.com/dudeiebot/sportPeerGo/pkg/errors"
@@ -20,6 +22,13 @@ type User struct {
 type Credentials struct {
 	Access   string `json:"access"`
 	Password string `json:"password"`
+}
+
+type ForgetPass struct {
+	Email          string `json:"email"`
+	Otp            string `json:"otp"`
+	ExpirationTime time.Time
+	NewPass        string `json:"password"`
 }
 
 func (u *User) ValidateUser() error {
