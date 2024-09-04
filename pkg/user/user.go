@@ -69,12 +69,20 @@ func GenerateUsername(email string) string {
 	return ""
 }
 
-func EncryptAuth(pass string) (string, error) {
-	hashedAuth, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
+func EncryptAuth(auth string) (string, error) {
+	hashedAuth, err := bcrypt.GenerateFromPassword([]byte(auth), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
 	}
 	return string(hashedAuth), nil
+}
+
+func CompareAuth(hashedAuth, unhashedAuth string) error {
+	err := bcrypt.CompareHashAndPassword([]byte(hashedAuth), []byte(unhashedAuth))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func AddHostSchemeMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -156,4 +164,17 @@ func ValidateToken(token string) (*Claim, error) {
 	}
 
 	return &claims, nil
+}
+
+func GenerateOTP() (string, error) {
+	randomBytes := make([]byte, 3)
+
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		return "", err
+	}
+
+	dotp := int64(randomBytes[0])<<16 | int64(randomBytes[1])<<8 | int64(randomBytes[2])
+	dotp = dotp % 1000000
+	return strconv.FormatInt(dotp, 10), nil
 }
