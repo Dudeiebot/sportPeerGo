@@ -2,6 +2,7 @@ package httpservice
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,12 +12,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/dudeiebot/sportPeerGo/pkg/adapter/dbs"
 	"github.com/dudeiebot/sportPeerGo/pkg/adapter/queries"
 	"github.com/dudeiebot/sportPeerGo/pkg/user"
-	"github.com/dudeiebot/sportPeerGo/pkg/user/email"
+	smtps "github.com/dudeiebot/sportPeerGo/pkg/user/email"
 	"github.com/dudeiebot/sportPeerGo/pkg/user/model"
 )
 
@@ -65,6 +65,53 @@ func NewServer(ctx context.Context) (*http.Server, error) {
 	return server, nil
 }
 
+func SendOtpEmail(s *Server) http.HandlerFunc {
+	return NewHandler(
+		func(ctx context.Context, req *http.Request) (*Response, error) {
+			email := chi.URLParam(req, "email")
+			var f model.ForgetPass
+
+			if req.ContentLength > 0 {
+				if err := json.NewDecoder(req.Body).Decode(&f); err != nil {
+					return nil, nil
+				}
+			}
+
+			f.Email = email
+			otp, err := user.GenerateOTP()
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate OTP: %w", err)
+			}
+			hashedOtp, err := user.EncryptAuth(otp)
+			if err != nil {
+				return nil, err
+			}
+			f.Otp = hashedOtp
+			f.ExpirationTime = time.Now().Add(15 * time.Minute)
+
+			err = queries.StoreOtpQueries(ctx, s.DBS, f)
+			if err != nil {
+				return nil, fmt.Errorf("failed to add user OTP: %w", err)
+			}
+
+			info := &smtps.UserInfo{
+				RecipientEmail:    f.Email,
+				VerificationToken: otp,
+			}
+			host, _ := ctx.Value("host").(string)
+			scheme, _ := ctx.Value("scheme").(string)
+
+			go func() {
+				if err := smtps.SendOtpEmail(info, host, scheme); err != nil {
+					log.Printf("Failed to send OTP Email: %v", err)
+				}
+			}()
+
+			return &Response{Message: "Forget Password Link Sent Successfully"}, nil
+		},
+	)
+}
+
 func CreateUser(s *Server) http.HandlerFunc {
 	return NewHandler(
 		func(ctx context.Context, u model.User) (map[string]interface{}, error) {
@@ -90,7 +137,7 @@ func CreateUser(s *Server) http.HandlerFunc {
 				return nil, fmt.Errorf("failed to register user and retrieve user ID")
 			}
 
-			info := &email.UserInfo{
+			info := &smtps.UserInfo{
 				RecipientEmail:    u.Email,
 				VerificationToken: u.VerificationToken,
 			}
@@ -99,7 +146,7 @@ func CreateUser(s *Server) http.HandlerFunc {
 			scheme, _ := ctx.Value("scheme").(string)
 
 			go func() {
-				if err := email.SendVerificationEmail(context.Background(), info, host, scheme); err != nil {
+				if err := smtps.SendVerificationEmail(info, host, scheme); err != nil {
 					log.Printf("Failed to send verification email: %v", err)
 				}
 			}()
@@ -139,6 +186,49 @@ func VerifyEmail(s *Server) http.HandlerFunc {
 	})
 }
 
+func VerifyOtpAndUpdatePass(s *Server) http.HandlerFunc {
+	return NewHandler(func(ctx context.Context, req *http.Request) (*Response, error) {
+		otp := req.URL.Query().Get("otptoken")
+		email := req.URL.Query().Get("email")
+		forgetPass, err := queries.GetOtpQueries(ctx, s.DBS, otp, email)
+		if err != nil {
+			return nil, fmt.Errorf("error retrieving OTP info: %w", err)
+		}
+
+		if err := user.CompareAuth(forgetPass.Otp, otp); err != nil {
+			return nil, fmt.Errorf("invalid OTP")
+		}
+
+		if time.Now().After(forgetPass.ExpirationTime) {
+			return nil, fmt.Errorf("OTP has expired")
+		}
+
+		var f model.ForgetPass
+		if err := json.NewDecoder(req.Body).Decode(&f); err != nil {
+			return nil, err
+		}
+
+		hashedPass, err := user.EncryptAuth(f.NewPass)
+		if err != nil {
+			return nil, err
+		}
+
+		f.Email = email
+		f.Otp = forgetPass.Otp
+		f.NewPass = hashedPass
+
+		if err := queries.UpdatePasswordQueries(ctx, s.DBS, f); err != nil {
+			return nil, fmt.Errorf("error updating password: %w", err)
+		}
+
+		if err := queries.ClearOtpQueries(ctx, s.DBS, email); err != nil {
+			return nil, fmt.Errorf("error clearing OTP: %w", err)
+		}
+
+		return &Response{Message: "Password updated successfully"}, nil
+	})
+}
+
 func LoginUser(s *Server) http.HandlerFunc {
 	return NewHandler(
 		func(ctx context.Context, c model.Credentials) (*LoginResponse, error) {
@@ -148,8 +238,7 @@ func LoginUser(s *Server) http.HandlerFunc {
 					"Invalid Credentials, Please provide the correct email or phone number",
 				)
 			}
-
-			if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(c.Password)); err != nil {
+			if err := user.CompareAuth(u.Password, c.Password); err != nil {
 				return nil, fmt.Errorf("Invalid Credentials, Please provide the correct password")
 			}
 
