@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/dudeiebot/sportPeerGo/pkg/adapter/dbs"
 	"github.com/dudeiebot/sportPeerGo/pkg/user/model"
@@ -52,6 +53,53 @@ func VerifyEmailQueries(ctx context.Context, d *dbs.Service, token string) (sql.
 	return res, err
 }
 
+func GetOtpQueries(
+	ctx context.Context,
+	d *dbs.Service,
+	otp, email string,
+) (*model.ForgetPass, error) {
+	queri := `
+		SELECT otp, otp_expiration
+		FROM users
+		WHERE email = ?
+	`
+	var forgetPass model.ForgetPass
+	err := d.DB.QueryRowContext(ctx, queri, email).Scan(&forgetPass.Otp, &forgetPass.ExpirationTime)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("no OTP found for this email")
+		}
+		return nil, fmt.Errorf("error querying database: %w", err)
+	}
+	return &forgetPass, nil
+}
+
+func UpdatePasswordQueries(ctx context.Context, d *dbs.Service, f model.ForgetPass) error {
+	queri := `
+		UPDATE users
+		SET password = ?
+		WHERE email = ?
+	`
+	_, err := d.DB.ExecContext(ctx, queri, f.NewPass, f.Email)
+	if err != nil {
+		return fmt.Errorf("error updating password: %w", err)
+	}
+	return nil
+}
+
+func ClearOtpQueries(ctx context.Context, d *dbs.Service, email string) error {
+	queri := `
+		UPDATE users
+		SET otp = NULL, otp_expiration = NULL
+		WHERE email = ?
+	`
+	_, err := d.DB.ExecContext(ctx, queri, email)
+	if err != nil {
+		return fmt.Errorf("error clearing OTP: %w", err)
+	}
+	return nil
+}
+
 func UsernameQueries(ctx context.Context, d *dbs.Service, u model.User) (sql.Result, error) {
 	queri := `UPDATE users SET username = ? WHERE id = ?`
 
@@ -66,15 +114,41 @@ func EmailQueries(ctx context.Context, d *dbs.Service, u model.User) (sql.Result
 	return res, err
 }
 
-func PassQueries(ctx context.Context, d *dbs.Service, f model.ForgetPass) error {
+func ForgetPassQueries(ctx context.Context, d *dbs.Service, f model.ForgetPass) error {
 	queri := `
 		UPDATE users
-		SET otp = ?, otp_expiration = ?
-		WHERE email = ?
+		SET password = ?
+		WHERE email = ? 
+		  AND otp = ?
+		  AND otp_expiration > ?
 	`
-	_, err := d.DB.ExecContext(ctx, queri, f.Otp, f.ExpirationTime, f.Email)
+
+	_, err := d.DB.ExecContext(ctx, queri, f.NewPass, f.Email, f.Otp, time.Now())
+	if err != nil {
+		return fmt.Errorf("error updating password: %w", err)
+	}
+
+	return nil
+}
+
+func StoreOtpQueries(ctx context.Context, d *dbs.Service, f model.ForgetPass) error {
+	queri := `
+        UPDATE users
+        SET otp = ?, otp_expiration = ?
+        WHERE email = ?
+    `
+	result, err := d.DB.ExecContext(ctx, queri, f.Otp, f.ExpirationTime, f.Email)
 	if err != nil {
 		return fmt.Errorf("error updating user's OTP in the database: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error getting rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no user found with email: %s", f.Email)
 	}
 
 	return nil
