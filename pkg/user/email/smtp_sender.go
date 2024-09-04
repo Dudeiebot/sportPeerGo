@@ -1,11 +1,9 @@
 package smtps
 
 import (
-	"context"
 	"fmt"
 	"net/smtp"
 	"os"
-	"time"
 
 	emailNew "github.com/jordan-wright/email"
 )
@@ -33,10 +31,7 @@ var config = &Config{
 	PostmarkToken: os.Getenv("POSTMARK_TOKEN"),
 }
 
-func SendVerificationEmail(ctx context.Context, info *UserInfo, host, scheme string) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
+func SendVerificationEmail(info *UserInfo, host, scheme string) error {
 	e := emailNew.NewEmail()
 	e.From = fmt.Sprintf("<%s>", config.FromEmail)
 	e.To = []string{info.RecipientEmail}
@@ -66,17 +61,16 @@ func SendVerificationEmail(ctx context.Context, info *UserInfo, host, scheme str
 	return nil
 }
 
-func SendOtpEmail(ctx context.Context, info *UserInfo) error {
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
+func SendOtpEmail(info *UserInfo, host, scheme string) error {
 	e := emailNew.NewEmail()
 	e.From = fmt.Sprintf("<%s>", config.FromEmail)
 	e.To = []string{info.RecipientEmail}
 	e.Subject = "Email Verification Link"
 	e.Text = []byte(
 		fmt.Sprintf(
-			"Here is your OTP: %s\n This email is for %s",
+			"Please Click the link to change your password: %s://%s/auth/pass?otptoken=%s?&email=%s",
+			scheme,
+			host,
 			info.VerificationToken,
 			info.RecipientEmail,
 		),
