@@ -11,7 +11,7 @@ func AuthRoutes(r chi.Router, s *Server) {
 		r.Post("/register", user.AddHostSchemeMiddleware(CreateUser(s)))
 		r.Post("/login", LoginUser(s))
 		r.Post("/logout", LogoutUser(s))
-		r.Post("/pass", user.AddHostSchemeMiddleware(VerifyOtpAndUpdatePass(s)))
+		r.Put("/updatepass", VerifyOtpAndUpdatePass(s))
 		r.Get("/verify-email", VerifyEmail(s))
 	})
 }
@@ -20,5 +20,6 @@ func UserRoute(r chi.Router, s *Server) {
 	r.Route("/users", func(r chi.Router) {
 		r.Put("/username/{id}", user.AuthMiddleware(UpdateUsername(s)))
 		r.Put("/email/{id}", user.AuthMiddleware(UpdateEmail(s)))
+		r.Post("/forgot-password/{email}", user.AddHostSchemeMiddleware(SendOtp(s)))
 	})
 }
