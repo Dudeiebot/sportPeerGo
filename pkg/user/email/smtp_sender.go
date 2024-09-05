@@ -9,12 +9,8 @@ import (
 )
 
 type UserInfo struct {
-	RecipientEmail    string
-	VerificationToken string
-}
-
-type Response struct {
-	Message string `json:"message"`
+	RecipientEmail string
+	Token          string
 }
 
 type Config struct {
@@ -31,63 +27,55 @@ var config = &Config{
 	PostmarkToken: os.Getenv("POSTMARK_TOKEN"),
 }
 
-func SendVerificationEmail(info *UserInfo, host, scheme string) error {
+func SendEmail(
+	recipientEmail, subject string,
+	textContent func(string, string) string,
+	host, scheme string,
+) error {
 	e := emailNew.NewEmail()
 	e.From = fmt.Sprintf("<%s>", config.FromEmail)
-	e.To = []string{info.RecipientEmail}
-	e.Subject = "Email Verification Link"
-	e.Text = []byte(
-		fmt.Sprintf(
-			"Please verify your email by clicking the link: %s://%s/auth/verify-email?token=%s",
-			scheme,
-			host,
-			info.VerificationToken,
-		),
-	)
+	e.To = []string{recipientEmail}
+	e.Subject = subject
+
+	e.Text = []byte(textContent(host, scheme))
 
 	err := e.Send(
 		fmt.Sprintf("%s:%s", config.SMTPServer, config.SMTPPort),
-		smtp.PlainAuth(
-			"",
-			config.PostmarkToken,
-			config.PostmarkToken,
-			config.SMTPServer,
-		),
+		smtp.PlainAuth("", config.PostmarkToken, config.PostmarkToken, config.SMTPServer),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
-
 	return nil
 }
 
+func SendVerificationEmail(info *UserInfo, host, scheme string) error {
+	return SendEmail(
+		info.RecipientEmail,
+		"Email Verification Link",
+		func(host, scheme string) string {
+			return fmt.Sprintf(
+				"Please verify your email by clicking the link: %s://%s/auth/verify-email?token=%s",
+				scheme, host, info.Token,
+			)
+		},
+		host, scheme,
+	)
+}
+
 func SendOtpEmail(info *UserInfo, host, scheme string) error {
-	e := emailNew.NewEmail()
-	e.From = fmt.Sprintf("<%s>", config.FromEmail)
-	e.To = []string{info.RecipientEmail}
-	e.Subject = "Email Verification Link"
-	e.Text = []byte(
-		fmt.Sprintf(
-			"Please Click the link to change your password: %s://%s/auth/pass?otptoken=%s?&email=%s",
-			scheme,
-			host,
-			info.VerificationToken,
-			info.RecipientEmail,
-		),
+	return SendEmail(
+		info.RecipientEmail,
+		"Password Changing Link",
+		func(host, scheme string) string {
+			return fmt.Sprintf(
+				"Please Click the link to change your password: %s://%s/auth/updatepass?otptoken=%s&email=%s",
+				scheme,
+				host,
+				info.Token,
+				info.RecipientEmail,
+			)
+		},
+		host, scheme,
 	)
-
-	err := e.Send(
-		fmt.Sprintf("%s:%s", config.SMTPServer, config.SMTPPort),
-		smtp.PlainAuth(
-			"",
-			config.PostmarkToken,
-			config.PostmarkToken,
-			config.SMTPServer,
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
-	}
-
-	return nil
 }
