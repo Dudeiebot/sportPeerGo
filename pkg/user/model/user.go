@@ -25,10 +25,10 @@ type Credentials struct {
 }
 
 type ForgetPass struct {
-	Email          string `json:"email"`
-	Otp            string `json:"otp"`
-	ExpirationTime time.Time
-	NewPass        string `json:"password"`
+	Email          string    `json:"email"`
+	Otp            string    `json:"otp"`
+	ExpirationTime time.Time `json:"expiration_time"`
+	NewPass        string    `json:"password"`
 }
 
 func (u *User) ValidateUser() error {
