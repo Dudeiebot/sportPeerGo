@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/dudeiebot/sportPeerGo/pkg/adapter/dbs"
-	"github.com/dudeiebot/sportPeerGo/pkg/adapter/queries"
+	query "github.com/dudeiebot/sportPeerGo/pkg/adapter/queries"
 	"github.com/dudeiebot/sportPeerGo/pkg/user"
 	smtps "github.com/dudeiebot/sportPeerGo/pkg/user/email"
 	"github.com/dudeiebot/sportPeerGo/pkg/user/model"
@@ -65,7 +65,7 @@ func NewServer(ctx context.Context) (*http.Server, error) {
 	return server, nil
 }
 
-func SendOtpEmail(s *Server) http.HandlerFunc {
+func SendOtp(s *Server) http.HandlerFunc {
 	return NewHandler(
 		func(ctx context.Context, req *http.Request) (*Response, error) {
 			email := chi.URLParam(req, "email")
@@ -87,16 +87,16 @@ func SendOtpEmail(s *Server) http.HandlerFunc {
 				return nil, err
 			}
 			f.Otp = hashedOtp
-			f.ExpirationTime = time.Now().Add(15 * time.Minute)
+			f.ExpirationTime = time.Now().Add(5 * time.Minute)
 
-			err = queries.StoreOtpQueries(ctx, s.DBS, f)
+			err = query.StoreOtpQuery(ctx, s.DBS, f)
 			if err != nil {
 				return nil, fmt.Errorf("failed to add user OTP: %w", err)
 			}
 
 			info := &smtps.UserInfo{
-				RecipientEmail:    f.Email,
-				VerificationToken: otp,
+				RecipientEmail: f.Email,
+				Token:          otp,
 			}
 			host, _ := ctx.Value("host").(string)
 			scheme, _ := ctx.Value("scheme").(string)
@@ -132,14 +132,14 @@ func CreateUser(s *Server) http.HandlerFunc {
 				return nil, err
 			}
 
-			u.ID = queries.RegisterQuery(u, s.DBS)
+			u.ID = query.RegisterQuery(u, s.DBS)
 			if u.ID == 0 {
 				return nil, fmt.Errorf("failed to register user and retrieve user ID")
 			}
 
 			info := &smtps.UserInfo{
-				RecipientEmail:    u.Email,
-				VerificationToken: u.VerificationToken,
+				RecipientEmail: u.Email,
+				Token:          u.VerificationToken,
 			}
 
 			host, _ := ctx.Value("host").(string)
@@ -170,7 +170,7 @@ func VerifyEmail(s *Server) http.HandlerFunc {
 	return NewHandler(func(ctx context.Context, r *http.Request) (*Response, error) {
 		token := r.URL.Query().Get("token")
 
-		res, err := queries.VerifyEmailQueries(ctx, s.DBS, token)
+		res, err := query.VerifyEmailQuery(ctx, s.DBS, token)
 		if err != nil {
 			log.Printf("Error executing db query: %v\n", err)
 			return nil, fmt.Errorf("internal server error")
@@ -190,7 +190,7 @@ func VerifyOtpAndUpdatePass(s *Server) http.HandlerFunc {
 	return NewHandler(func(ctx context.Context, req *http.Request) (*Response, error) {
 		otp := req.URL.Query().Get("otptoken")
 		email := req.URL.Query().Get("email")
-		forgetPass, err := queries.GetOtpQueries(ctx, s.DBS, otp, email)
+		forgetPass, err := query.GetOtpQuery(ctx, s.DBS, email)
 		if err != nil {
 			return nil, fmt.Errorf("error retrieving OTP info: %w", err)
 		}
@@ -214,14 +214,13 @@ func VerifyOtpAndUpdatePass(s *Server) http.HandlerFunc {
 		}
 
 		f.Email = email
-		f.Otp = forgetPass.Otp
 		f.NewPass = hashedPass
 
-		if err := queries.UpdatePasswordQueries(ctx, s.DBS, f); err != nil {
+		if err := query.UpdatePasswordQuery(ctx, s.DBS, f); err != nil {
 			return nil, fmt.Errorf("error updating password: %w", err)
 		}
 
-		if err := queries.ClearOtpQueries(ctx, s.DBS, email); err != nil {
+		if err := query.ClearOtpQuery(ctx, s.DBS, email); err != nil {
 			return nil, fmt.Errorf("error clearing OTP: %w", err)
 		}
 
@@ -232,7 +231,7 @@ func VerifyOtpAndUpdatePass(s *Server) http.HandlerFunc {
 func LoginUser(s *Server) http.HandlerFunc {
 	return NewHandler(
 		func(ctx context.Context, c model.Credentials) (*LoginResponse, error) {
-			u, err := queries.GetHashedAuth(ctx, c, s.DBS)
+			u, err := query.GetHashedAuth(ctx, c, s.DBS)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"Invalid Credentials, Please provide the correct email or phone number",
@@ -270,9 +269,9 @@ func LogoutUser(s *Server) http.HandlerFunc {
 }
 
 func UpdateUsername(s *Server) http.HandlerFunc {
-	return NewUpdateHandler(s, queries.UsernameQueries, "Username successfully changed")
+	return NewUpdateHandler(s, query.UsernameQuery, "Username successfully changed")
 }
 
 func UpdateEmail(s *Server) http.HandlerFunc {
-	return NewUpdateHandler(s, queries.EmailQueries, "Email changed successfully")
+	return NewUpdateHandler(s, query.EmailQuery, "Email changed successfully")
 }
