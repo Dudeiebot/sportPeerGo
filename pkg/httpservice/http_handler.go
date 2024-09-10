@@ -18,10 +18,6 @@ func NewHandler[IN, OUT any](
 	targetFunc func(context.Context, IN) (OUT, error),
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// if user.IsLoggedOut(r) {
-		// 	http.Error(w, "User is logged out", http.StatusUnauthorized)
-		// 	return
-		// }
 		var in IN
 		if reflect.TypeOf(in) != reflect.TypeOf((*http.Request)(nil)) {
 			if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
