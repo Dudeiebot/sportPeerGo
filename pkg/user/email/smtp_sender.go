@@ -2,6 +2,7 @@ package smtps
 
 import (
 	"fmt"
+	"net/http"
 	"net/smtp"
 	"os"
 
@@ -28,17 +29,15 @@ var config = &Config{
 }
 
 func SendEmail(
-	recipientEmail, subject string,
-	textContent func(string, string) string,
-	host, scheme string,
+	recipientEmail, subject, content string,
+	r *http.Request,
 ) error {
 	e := emailNew.NewEmail()
 	e.From = fmt.Sprintf("<%s>", config.FromEmail)
 	e.To = []string{recipientEmail}
 	e.Subject = subject
 
-	e.Text = []byte(textContent(host, scheme))
-
+	e.Text = []byte(content)
 	err := e.Send(
 		fmt.Sprintf("%s:%s", config.SMTPServer, config.SMTPPort),
 		smtp.PlainAuth("", config.PostmarkToken, config.PostmarkToken, config.SMTPServer),
@@ -49,33 +48,28 @@ func SendEmail(
 	return nil
 }
 
-func SendVerificationEmail(info *UserInfo, host, scheme string) error {
-	return SendEmail(
-		info.RecipientEmail,
-		"Email Verification Link",
-		func(host, scheme string) string {
-			return fmt.Sprintf(
-				"Please verify your email by clicking the link: %s://%s/auth/verify-email?token=%s",
-				scheme, host, info.Token,
-			)
-		},
-		host, scheme,
+func SendVerificationEmail(info *UserInfo, r *http.Request) error {
+	content := fmt.Sprintf(
+		"Please verify your email by clicking the link: %s://%s/auth/verify-email?token=%s",
+		getScheme(r), r.Host, info.Token,
 	)
+	return SendEmail(info.RecipientEmail, "Email Verification Link", content, r)
 }
 
-func SendOtpEmail(info *UserInfo, host, scheme string) error {
-	return SendEmail(
+func SendOtpEmail(info *UserInfo, r *http.Request) error {
+	content := fmt.Sprintf(
+		"Please Click the link to change your password: %s://%s/auth/updatepass?otptoken=%s&email=%s",
+		getScheme(r),
+		r.Host,
+		info.Token,
 		info.RecipientEmail,
-		"Password Changing Link",
-		func(host, scheme string) string {
-			return fmt.Sprintf(
-				"Please Click the link to change your password: %s://%s/auth/updatepass?otptoken=%s&email=%s",
-				scheme,
-				host,
-				info.Token,
-				info.RecipientEmail,
-			)
-		},
-		host, scheme,
 	)
+	return SendEmail(info.RecipientEmail, "Password Changing Link", content, r)
+}
+
+func getScheme(r *http.Request) string {
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
 }
