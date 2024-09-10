@@ -98,11 +98,8 @@ func SendOtp(s *Server) http.HandlerFunc {
 				RecipientEmail: f.Email,
 				Token:          otp,
 			}
-			host, _ := ctx.Value("host").(string)
-			scheme, _ := ctx.Value("scheme").(string)
-
 			go func() {
-				if err := smtps.SendOtpEmail(info, host, scheme); err != nil {
+				if err := smtps.SendOtpEmail(info, req); err != nil {
 					log.Printf("Failed to send OTP Email: %v", err)
 				}
 			}()
@@ -114,7 +111,11 @@ func SendOtp(s *Server) http.HandlerFunc {
 
 func CreateUser(s *Server) http.HandlerFunc {
 	return NewHandler(
-		func(ctx context.Context, u model.User) (map[string]interface{}, error) {
+		func(ctx context.Context, r *http.Request) (map[string]interface{}, error) {
+			var u model.User
+			if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
+				return nil, err
+			}
 			if err := u.ValidateUser(); err != nil {
 				return nil, err
 			}
@@ -142,11 +143,8 @@ func CreateUser(s *Server) http.HandlerFunc {
 				Token:          u.VerificationToken,
 			}
 
-			host, _ := ctx.Value("host").(string)
-			scheme, _ := ctx.Value("scheme").(string)
-
 			go func() {
-				if err := smtps.SendVerificationEmail(info, host, scheme); err != nil {
+				if err := smtps.SendVerificationEmail(info, r); err != nil {
 					log.Printf("Failed to send verification email: %v", err)
 				}
 			}()
