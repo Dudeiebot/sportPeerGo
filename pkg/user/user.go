@@ -85,18 +85,7 @@ func CompareAuth(hashedAuth, unhashedAuth string) error {
 	return nil
 }
 
-func AddHostSchemeMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-		ctx := context.WithValue(r.Context(), "host", r.Host)
-		ctx = context.WithValue(ctx, "scheme", scheme)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
+// take this to http-server
 func IsLoggedOut(r *http.Request) bool {
 	cookie, err := r.Cookie("token")
 	if err != nil || cookie.Value == "" {
